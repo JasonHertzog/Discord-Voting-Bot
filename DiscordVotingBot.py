@@ -1,5 +1,10 @@
 # A bot that allows users to vote for various things through Discord.
 
+# TO DO
+# I fixed most of this and it's functional, but I still want to add the option to
+# Change max votes and also a help command. I also need to add user authentificaiton
+# So admins can set permissions.
+
 # How it works:
 # 1. The bot connects to Discord and logs in.
 # 2. The bot listens for commands from users.  
@@ -15,14 +20,19 @@
 # /help (Shows the commands with an explanation)
 # All commands can be used by interacting with reactions on the voting topic.
 
+# Things the bot must at least be able to do
+# Add options to the menu
+# Admins can delete options from the menu
+# Admins can clear the menu
+# Admins can close the poll
+
 # Importing the necessary modules
-from xml.dom.expatbuilder import parseString
-import nextcord
+import nextcord as discord
 from nextcord.ext import commands
 
 
 # Path to find Credentials.txt (You'll need to change this to your own path)
-CREDENTIALS_PATH = "/***/DiscordVotingBot/"
+CREDENTIALS_PATH = "YOUR_DIRECTORY/DiscordVotingBot/"
 
 # Create bot
 bot = commands.Bot(command_prefix="/")
@@ -43,11 +53,15 @@ async def on_ready():
 
 
 # Allow user to use StartVote command (/startvote)
-@bot.command()
+@bot.slash_command("start", "Start a vote by typing /start <voting topic>")
 async def start(ctx, *, topic = None):
     if topic == None:
-        await ctx.channel.send("Please enter a topic.")
-        await ctx.channel.send("Example: /start Movie Night")
+        await ctx.send("Please enter a topic.")
+        await ctx.send("Example: /start Movie Night")
+        return
+    # Make sure that there isn't already an active vote.
+    if len(votingTopic) != 0:
+        await ctx.send("There is already a voting topic.")
         return
     # Add topic to votingTopic hashmap
     votingTopic[0] = topic
@@ -55,68 +69,73 @@ async def start(ctx, *, topic = None):
     await ctx.channel.send("Voting on: " + topic)
     # Print a message to the console
     print("Voting topic created: " + topic)
-    await ctx.channel.send("Add options by using the /add <\"option\"> command")
+    await ctx.send("Add options by using the /add <\"option\"> command")
     print("-" * 20)
 
 
-@bot.command()
+@bot.slash_command('add', "Add an option to the voting topic")
 async def add(ctx, *, option = None):
     if option == None:
-        await ctx.channel.send("Please enter an option.")
-        await ctx.channel.send("Example: /add \"Inception\"")
+        await ctx.send("Please enter an option.")
+        await ctx.send("Example: /add \"Inception\"")
         return
     # Add option to voting topic if there isn't already 20 options
     if len(votingOptions) < 20:
-        await ctx.channel.send("Option added: " + option)
+        #reply to the user to let them know the option was dded.
+        await ctx.send("Option added: " + option)
         print("Option added: " + option)
         # Add option to votingOptions hashmap
         votingOptions[len(votingOptions)] = option
         userVotes[len(userVotes)] = 0
     print("-" * 20)
 
-@bot.command()
+@bot.slash_command("choices", "Show the choices for the current voting topic")
 #show the options for the current voting topic
 async def options(ctx):
     if len(votingOptions) == 0:
-        await ctx.channel.send("There are no options for this voting topic.")
+        await ctx.send("There are no options for this voting topic.")
         return
-    # Show the options and allow the user to vote for them by reacting to the message
-    await ctx.channel.send("Voting options:")
+    # Use embed to show the options
+    embed = discord.Embed(title = "Voting Options", description = "", color = 0x00ff00)
     for i in range(len(votingOptions)):
-        await ctx.channel.send(str(i + 1) + ": " + votingOptions[i])
+        embed.add_field(name = str(i + 1) + ". " + votingOptions[i], value = "/vote " + str(i + 1), inline = False)
+    await ctx.channel.send(embed = embed)
+    # Show the options and allow the user to vote for them by reacting to the message
+    await ctx.send("Voting options:")
+    for i in range(len(votingOptions)):
+        await ctx.send(str(i + 1) + ": " + votingOptions[i])
     print("-" * 20)
 
-@bot.command()
+@bot.slash_command("vote", "Cast a vote for an option")
 # Allow users to vote on an option
-async def vote(ctx, *, option = None, maxVotes = maxVotes):
-    if option == None:
-        await ctx.channel.send("Please enter an option.")
-        await ctx.channel.send("Example: /vote 1")
+async def vote(ctx, *, options = None):
+    if options == None:
+        await ctx.send("Please enter an option.")
+        await ctx.send("Example: /vote 1")
         return
     # Check if the option is a valid number
-    if option.isdigit() == True:
-        option = int(option)
+    if options.isdigit() == True:
+        options = int(options)
         # Check if the option is a valid number
-        if option > len(votingOptions) or option < 1:
-            await ctx.channel.send("Please enter a valid option. (use /options to see options)")
-            await ctx.channel.send("Example: /vote 1")
+        if options > len(votingOptions) or options < 1:
+            await ctx.send("Please enter a valid option. (use /options to see options)")
+            await ctx.send("Example: /vote 1")
             return
     else:
-        await ctx.channel.send("Please enter a valid option. (use /options to see options)")
-        await ctx.channel.send("Example: /vote 1 (for the first option)")
+        await ctx.send("Please enter a valid option. (use /options to see options)")
+        await ctx.send("Example: /vote 1 (for the first option)")
         return
     # Check if the user has already used their max votes
-    if ctx.author.name in userVotes:
-        if userVotes[ctx.author.name] >= maxVotes:
-            await ctx.channel.send("You have already used your max votes.")
+    if ctx.user in userVotes:
+        if userVotes[ctx.user] >= maxVotes:
+            await ctx.send("You have already used your max votes.")
             return
     # Add the user's vote to the userVotes hashmap
-    userVotes[option - 1] = userVotes.get(option - 1, 0) + 1
+    userVotes[options - 1] = userVotes.get(options - 1, 0) + 1
     # Keep track of user's vote in userVotes hashmap
-    userVotes[ctx.author.name] = userVotes.get(ctx.author.name, 0) + 1
+    userVotes[ctx.user] = userVotes.get(ctx.user, 0) + 1
     # Add a reaction to the message
-    await ctx.message.add_reaction("\U0001F44D")
-    print("User voted for option: " + str(option))
+    print("User voted for option: " + str(options))
     print("-" * 20)
     # Put an embed scoreboard up using discord
     embed = discord.Embed(title = votingTopic[0], description = "", color = 0x00ff00)
@@ -126,10 +145,10 @@ async def vote(ctx, *, option = None, maxVotes = maxVotes):
     await ctx.channel.send(embed = embed)
 
 # Show the results of the voting
-@bot.command()
+@bot.slash_command("end", "End the vote.")
 async def end(ctx):
     if len(votingOptions) == 0:
-        await ctx.channel.send("There are no options for this voting topic.")
+        await ctx.send("There are no options for this voting topic.")
         return
     # Show the results of the voting topic by using embeds
     embed = discord.Embed(title = votingTopic[0], description = "Final Results", color = 0x00ff00)
@@ -141,14 +160,15 @@ async def end(ctx):
         embed.add_field(name = str(i + 1) + ": " + votingOptions[i], value = str(userVotes[i]) + " votes", inline = False)
     await ctx.channel.send(embed = embed)
     # Reset the voting topic and options
-    votingTopic = {}
-    votingOptions = {}
-    userVotes = {}
+    resetHashmaps()
     # Inform guild that voting has ended.
-    await ctx.channel.send("Voting topic closed.")
+    await ctx.send("Voting topic closed.")
 
     
-
+def resetHashmaps():
+    votingOptions.clear()
+    votingTopic.clear()
+    userVotes.clear()
 
 
 if __name__ == '__main__':
