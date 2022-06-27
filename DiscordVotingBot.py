@@ -1,10 +1,5 @@
 # A bot that allows users to vote for various things through Discord.
 
-# TO DO
-# I fixed most of this and it's functional, but I still want to add the option to
-# Change max votes and also a help command. I also need to add user authentificaiton
-# So admins can set permissions.
-
 # How it works:
 # 1. The bot connects to Discord and logs in.
 # 2. The bot listens for commands from users.  
@@ -32,7 +27,7 @@ from nextcord.ext import commands
 
 
 # Path to find Credentials.txt (You'll need to change this to your own path)
-CREDENTIALS_PATH = "YOUR_DIRECTORY/DiscordVotingBot/"
+CREDENTIALS_PATH = "/PUT_YOUR_PATH_HERE_DONT_IGNORE_THIS/"
 
 # Create bot
 bot = commands.Bot(command_prefix="/")
@@ -163,6 +158,12 @@ async def end(ctx):
     resetHashmaps()
     # Inform guild that voting has ended.
     await ctx.send("Voting topic closed.")
+
+    # Easter egg command: Who is most skilled?
+@bot.slash_command("mostskilled", "Show the most skilled user to have ever existed.")
+async def mostskilled(ctx):
+    await ctx.send("The most skilled user to have ever existed is: Skilled Apple#5994")
+    await ctx.channel.send("If I do anything stupid, message him and he'll tell you to fix it yourself.")
 
     
 def resetHashmaps():
