@@ -15,19 +15,26 @@
 # /help (Shows the commands with an explanation)
 # All commands can be used by interacting with reactions on the voting topic.
 
-# Things the bot must at least be able to do
-# Add options to the menu
-# Admins can delete options from the menu
-# Admins can clear the menu
-# Admins can close the poll
+"""
+Things left to do:
+/adminmode <confirm> (Sets admin-mode on or off)
+/admin delete <option number> (Deletes an option)
+/admin end <confirm> (update /end)
+/admin close <confirm> (stop votes but don't reset results)
+/admin show (show the voting options to everyone) (update /choices and /vote)
+/admin removevoter <voter id> (remove a voter from the list of voters)
+- Show who voted for what (@username)
+"""
 
 # Importing the necessary modules
 import nextcord as discord
 from nextcord.ext import commands
+from collections import Counter
+
 
 
 # Path to find Credentials.txt (You'll need to change this to your own path)
-CREDENTIALS_PATH = "/PUT_YOUR_PATH_HERE_DONT_IGNORE_THIS/"
+CREDENTIALS_PATH = "/YOUR_DIRECTORY/DiscordVotingBot/"
 
 # Create bot
 bot = commands.Bot(command_prefix="/")
@@ -37,6 +44,7 @@ votingTopic = {}
 votingOptions = {}
 userVotes = {}
 maxVotes = 3
+
 
 @bot.event
 async def on_ready():
@@ -81,6 +89,7 @@ async def add(ctx, *, option = None):
         print("Option added: " + option)
         # Add option to votingOptions hashmap
         votingOptions[len(votingOptions)] = option
+        # add 0 votes to userVotes hashmap
         userVotes[len(userVotes)] = 0
     print("-" * 20)
 
@@ -96,9 +105,8 @@ async def options(ctx):
         embed.add_field(name = str(i + 1) + ". " + votingOptions[i], value = "/vote " + str(i + 1), inline = False)
     await ctx.channel.send(embed = embed)
     # Show the options and allow the user to vote for them by reacting to the message
-    await ctx.send("Voting options:")
-    for i in range(len(votingOptions)):
-        await ctx.send(str(i + 1) + ": " + votingOptions[i])
+    print("-" * 20)
+    print("Voting options shown.")
     print("-" * 20)
 
 @bot.slash_command("vote", "Cast a vote for an option")
@@ -121,23 +129,26 @@ async def vote(ctx, *, options = None):
         await ctx.send("Example: /vote 1 (for the first option)")
         return
     # Check if the user has already used their max votes
-    if ctx.user in userVotes:
-        if userVotes[ctx.user] >= maxVotes:
+    if ctx.user.mention in userVotes:
+        if userVotes[ctx.user.mention] >= maxVotes:
             await ctx.send("You have already used your max votes.")
             return
     # Add the user's vote to the userVotes hashmap
     userVotes[options - 1] = userVotes.get(options - 1, 0) + 1
     # Keep track of user's vote in userVotes hashmap
-    userVotes[ctx.user] = userVotes.get(ctx.user, 0) + 1
-    # Add a reaction to the message
-    print("User voted for option: " + str(options))
+    userVotes[ctx.user.mention] = userVotes.get(ctx.user.mention, 0) + 1
+    # Mention user who used the command)
+    await ctx.send(str(ctx.user.mention) + " has voted for " + votingOptions[options - 1])
+    print(str(ctx.user.mention) + " voted for option: " + str(options))
     print("-" * 20)
+    # Commeted out the following 6 lines of code because it was spammy.
+    """
     # Put an embed scoreboard up using discord
     embed = discord.Embed(title = votingTopic[0], description = "", color = 0x00ff00)
     # Show all the options and their votes
     for i in range(len(votingOptions)):
         embed.add_field(name = str(i + 1) + ": " + votingOptions[i], value = str(userVotes[i]) + " votes", inline = False)
-    await ctx.channel.send(embed = embed)
+    await ctx.channel.send(embed = embed)"""
 
 # Show the results of the voting
 @bot.slash_command("end", "End the vote.")
@@ -145,15 +156,54 @@ async def end(ctx):
     if len(votingOptions) == 0:
         await ctx.send("There are no options for this voting topic.")
         return
+    if len(userVotes) < 4:
+        print("You need at least 4 options")
+        await ctx.send("You need at least 4 options.")
+        return
     # Show the results of the voting topic by using embeds
     embed = discord.Embed(title = votingTopic[0], description = "Final Results", color = 0x00ff00)
     # Show all the options and their votes
-    for i in range(len(votingOptions)):
-        # make sure the votes are not None
-        if userVotes[i] == None:
-            userVotes[i] = 0
-        embed.add_field(name = str(i + 1) + ": " + votingOptions[i], value = str(userVotes[i]) + " votes", inline = False)
+    # Count the total votes and display the top 3 uservotes
+    maxvotes = -1
+    for i in range(len(userVotes) - 1):
+        if userVotes[i] > maxvotes:
+            maxvotes = userVotes[i]
+            maxindex = i
+    winner = votingOptions[maxindex]
+    embed.add_field(name = "Winner: " + winner, value = "Votes: " + str(maxvotes), inline = False)
+    # set votingOptions and userVotes at maxindex to -1
+    votingOptions[maxindex] = -1
+    userVotes[maxindex] = -1
+    # reset max index and find the second highest vote
+    maxvotes = -1
+    for i in range(len(userVotes) - 1):
+        if userVotes[i] > maxvotes:
+            maxvotes = userVotes[i]
+            maxindex = i
+    embed.add_field(name = "Second Place: " + votingOptions[maxindex], value = "Votes: " + str(maxvotes), inline = False)
+    # remove maxindex from uservotes and votingoptions
+    votingOptions[maxindex] = -1
+    userVotes[maxindex] = -1
+    # reset max index and find the third highest vote
+    maxvotes = -1
+    for i in range(len(userVotes) - 1):
+        if userVotes[i] > maxvotes:
+            maxvotes = userVotes[i]
+            maxindex = i
+    embed.add_field(name = "Third Place: " + votingOptions[maxindex], value = "Votes: " + str(maxvotes), inline = False)
+    # remove maxindex from uservotes and votingoptions
+    del userVotes[maxindex]
+    del votingOptions[maxindex]
+    maxindex = -1
+    # Show the results of the voting topic by using embeds
     await ctx.channel.send(embed = embed)
+
+    # send the remaining loses as a message in a formated way
+    message = "The following options have lost: "
+    for i in range(len(votingOptions)):
+        if(votingOptions[i] != -1):
+            message = message + str(votingOptions[i]) + ", "
+    await ctx.channel.send(message)
     # Reset the voting topic and options
     resetHashmaps()
     # Inform guild that voting has ended.
@@ -165,7 +215,8 @@ async def mostskilled(ctx):
     await ctx.send("The most skilled user to have ever existed is: Skilled Apple#5994")
     await ctx.channel.send("If I do anything stupid, message him and he'll tell you to fix it yourself.")
 
-    
+
+
 def resetHashmaps():
     votingOptions.clear()
     votingTopic.clear()
